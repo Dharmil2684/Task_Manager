@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace TaskManager.Core.Models
+namespace TaskManager.Models
 {
     public abstract class BaseEntity
     {

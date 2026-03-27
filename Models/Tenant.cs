@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.Json.Serialization;
 
-namespace TaskManager.Core.Models
+namespace TaskManager.Models
 {
     public class Tenant : BaseEntity
     {

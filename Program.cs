@@ -1,6 +1,8 @@
 using Microsoft.Azure.Cosmos;
-using TaskManager.Core.Interfaces;
-using TaskManager.Infrastructure.Data;
+using TaskManager.Interfaces;
+using TaskManager.Models;
+using TaskManager.Data;
+using TaskManager.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,16 +11,40 @@ var cosmosEndpoint = builder.Configuration["CosmosDb:EndpointUri"];
 var cosmos = builder.Configuration["CosmosDb:PrimaryKey"];
 var databaseName = builder.Configuration["CosmosDb:DatabaseName"];
 
-var cosmosClient = new CosmosClient(cosmosEndpoint, cosmos);
+if (string.IsNullOrWhiteSpace(cosmosEndpoint) || string.IsNullOrWhiteSpace(cosmos))
+{
+    throw new InvalidOperationException("Critical Cosmos DB connection details are missing from configuration.");
+}
 
-builder.Services.AddSingleton<ICosmosDbRepository<TaskManager.Core.Models.TaskItem>>(
-    new CosmosDbRepository<TaskManager.Core.Models.TaskItem>(cosmosClient, databaseName, "Tasks"));
+if (string.IsNullOrWhiteSpace(databaseName))
+{
+    throw new InvalidOperationException("The CosmosDb:DatabaseName configuration is missing. The application cannot start.");
+}
 
-builder.Services.AddSingleton<ICosmosDbRepository<TaskManager.Core.Models.User>>(
-    new CosmosDbRepository<TaskManager.Core.Models.User>(cosmosClient, databaseName, "Users"));
+builder.Services.AddSingleton<CosmosClient>(sp => new CosmosClient(cosmosEndpoint, cosmos));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantContext, TenantContext>();
 
-builder.Services.AddSingleton<ICosmosDbRepository<TaskManager.Core.Models.Tenant>>(
-    new CosmosDbRepository<TaskManager.Core.Models.Tenant>(cosmosClient, databaseName, "Tenants"));
+builder.Services.AddScoped<ICosmosDbRepository<TaskItem>>(sp =>
+{
+    var client = sp.GetRequiredService<CosmosClient>();
+    var tenantContext = sp.GetRequiredService<ITenantContext>();
+    return new CosmosDbRepository<TaskItem>(client, databaseName, "Tasks", tenantContext);
+});
+
+builder.Services.AddScoped<ICosmosDbRepository<TaskManager.Models.User>>(sp =>
+{
+    var client = sp.GetRequiredService<CosmosClient>();
+    var tenantContext = sp.GetRequiredService<ITenantContext>();
+    return new CosmosDbRepository<TaskManager.Models.User>(client, databaseName, "Users", tenantContext);
+});
+
+builder.Services.AddScoped<ICosmosDbRepository<Tenant>>(sp =>
+{
+    var client = sp.GetRequiredService<CosmosClient>();
+    var tenantContext = sp.GetRequiredService<ITenantContext>();
+    return new CosmosDbRepository<Tenant>(client, databaseName, "Tenants", tenantContext);
+});
 
 builder.Services.AddControllers();
 // Swagger UI Add services to generate OpenAPI documents

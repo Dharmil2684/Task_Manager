@@ -1,31 +1,32 @@
-﻿using TaskManager.Core.Interfaces;
-using Microsoft.Azure.Cosmos;
+﻿using Microsoft.Azure.Cosmos;
+using TaskManager.Interfaces;
 
 
-namespace TaskManager.Infrastructure.Data
+namespace TaskManager.Data
 {
-    public class CosmosDbRepository<T> : ICosmosDbRepository<T> where T : class
+    public class CosmosDbRepository<T> (CosmosClient dbClient, string databaseName, string containerName, ITenantContext tenantContext) : ICosmosDbRepository<T> where T : class
     {
-        private readonly Container _container;
-        public CosmosDbRepository(CosmosClient dbClient, string databaseName, string containerName)
+        private readonly Container _container = dbClient.GetContainer(databaseName, containerName);
+        private readonly ITenantContext _tenantContext = tenantContext;
+
+        public async Task AddItemAsync(T item)
         {
-            _container = dbClient.GetContainer(databaseName, containerName);
-        }
-        public async Task AddItemAsync(T item, string partitionKey)
-        {
-            await _container.CreateItemAsync(item, new PartitionKey(partitionKey));
+            var partitionKey = new PartitionKey(_tenantContext.CurrentTenantId);
+            await _container.CreateItemAsync(item, partitionKey);
         }
 
-        public async Task DeleteItemAsync(string id, string partitionKey)
+        public async Task DeleteItemAsync(string id)
         {
-            await _container.DeleteItemAsync<T>(id, new PartitionKey(partitionKey));
+            var partitionKey = new PartitionKey(_tenantContext.CurrentTenantId);
+            await _container.DeleteItemAsync<T>(id, partitionKey);
         }
 
-        public async Task<T> GetItemAsync(string id, string partitionKey)
+        public async Task<T> GetItemAsync(string id)
         {
             try 
             {
-                ItemResponse<T> response = await _container.ReadItemAsync<T>(id, new PartitionKey(partitionKey));
+                var partitionKey = new PartitionKey(_tenantContext.CurrentTenantId);
+                ItemResponse<T> response = await _container.ReadItemAsync<T>(id, partitionKey);
                 return response.Resource;
             }
             catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -33,11 +34,10 @@ namespace TaskManager.Infrastructure.Data
                 return null;
             }
         }
-
-        public async Task<IEnumerable<T>> GetItemsAsync(string queryString)
+        public async Task<IEnumerable<T>> GetItemsAsync(QueryDefinition queryDefinition)
         {
-            var query = _container.GetItemQueryIterator<T>(new QueryDefinition(queryString));
-            List<T> results = new List<T>();
+            var query = _container.GetItemQueryIterator<T>(queryDefinition);
+            List<T> results = [];
             while (query.HasMoreResults)
             {
                 var response = await query.ReadNextAsync();
@@ -46,9 +46,16 @@ namespace TaskManager.Infrastructure.Data
             return results;
         }
 
-        public async Task UpdateItemAsync(string id, T item, string partitionKey)
+        public async Task UpdateItemAsync(string id, T item)
         {
-            await _container.UpsertItemAsync(item, new PartitionKey(partitionKey));
+            var partitionKey = new PartitionKey(_tenantContext.CurrentTenantId);
+            await _container.ReplaceItemAsync(item, id, partitionKey);
+        }
+
+        public async Task UpsertItemAsync(T item)
+        {
+            var partitionKey = new PartitionKey(_tenantContext.CurrentTenantId);
+            await _container.UpsertItemAsync(item, partitionKey);
         }
     }
 }

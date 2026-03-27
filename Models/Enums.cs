@@ -1,4 +1,4 @@
-﻿namespace TaskManager.Core.Enums
+﻿namespace TaskManager.Models
 {
     public enum UserRole
     {
@@ -6,7 +6,6 @@
         Manager,
         Employee
     }
-
     public enum WorkTaskStatus
     {
         Pending,

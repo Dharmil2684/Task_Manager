@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Text.Json.Serialization;
-using TaskManager.Core.Enums;
-using TaskManager.Core.Models;
 
-namespace TaskManager.Core.Models
+namespace TaskManager.Models
 {
     public class User : BaseEntity
     {
