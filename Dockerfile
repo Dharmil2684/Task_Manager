@@ -2,15 +2,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy solution and restore as distinct layers
-COPY TaskManager.sln ./
+# Copy projects and restore as distinct layers
 COPY src/TaskManager.Core/TaskManager.Core.csproj src/TaskManager.Core/
 COPY src/TaskManager.Infrastructure/TaskManager.Infrastructure.csproj src/TaskManager.Infrastructure/
 COPY src/TaskManager.Services/TaskManager.Services.csproj src/TaskManager.Services/
 COPY src/TaskManager.API/TaskManager.API.csproj src/TaskManager.API/
-COPY tests/TaskManager.Tests/TaskManager.Tests.csproj tests/TaskManager.Tests/
 
-RUN dotnet restore
+RUN dotnet restore src/TaskManager.API/TaskManager.API.csproj
 
 # Copy everything else and build the release API
 COPY src/ src/
