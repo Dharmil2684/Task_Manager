@@ -23,30 +23,26 @@ namespace TaskManager.Infrastructure
             // Create container for Tenants
             await database.CreateContainerIfNotExistsAsync(
                 id: "Tenants",
-                partitionKeyPath: "/id", // Tenants isolated by their own ID
-                throughput: 400
+                partitionKeyPath: "/id"
             );
-
+        
             // Create container for Users
             await database.CreateContainerIfNotExistsAsync(
                 id: "Users",
-                partitionKeyPath: "/tenantId",
-                throughput: 400
+                partitionKeyPath: "/tenantId"
             );
-
+        
             // Create container for Tasks
             await database.CreateContainerIfNotExistsAsync(
                 id: "Tasks",
-                partitionKeyPath: "/tenantId",
-                throughput: 400
+                partitionKeyPath: "/tenantId"
             );
-
+        
             // Create container for InvitationTokens
             await database.CreateContainerIfNotExistsAsync(
                 id: "InvitationTokens",
-                partitionKeyPath: "/tenantId",
-                throughput: 400
-            );
+                partitionKeyPath: "/tenantId"
+    );
         }
     }
 }
