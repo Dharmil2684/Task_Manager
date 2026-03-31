@@ -6,6 +6,7 @@ namespace TaskManager.Core.Entities
     {
         // Cosmos DB strictly requires the unique identifier to be lowercase "id"
         [JsonPropertyName("id")]
+        [Newtonsoft.Json.JsonProperty("id")]
         public Guid Id { get; init; } = Guid.NewGuid();
     }
 }

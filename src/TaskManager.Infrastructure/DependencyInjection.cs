@@ -34,6 +34,10 @@ namespace TaskManager.Infrastructure
             // Register CosmosClient as singleton
             services.AddSingleton<CosmosClient>(sp => new CosmosClient(cosmosEndpoint, cosmosKey, new CosmosClientOptions
             {
+                SerializerOptions = new CosmosSerializationOptions
+                {
+                    PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
+                },
                 MaxRetryAttemptsOnRateLimitedRequests = 3,
                 MaxRetryWaitTimeOnRateLimitedRequests = TimeSpan.FromSeconds(10)
             }));

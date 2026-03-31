@@ -16,11 +16,34 @@ namespace TaskManager.Infrastructure.Persistence
                                            ex.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
             .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-        public async Task AddItemAsync(T item, CancellationToken cancellationToken = default)
+        public async Task AddItemAsync(T item, string? partitionKey = null, CancellationToken cancellationToken = default)
         {
-            var partitionKey = new PartitionKey(_tenantContext.CurrentTenantId);
-            await _retryPolicy.ExecuteAsync(ct => 
-                _container.CreateItemAsync(item, partitionKey, cancellationToken: ct), cancellationToken);
+            var resolvedPartitionKey = !string.IsNullOrEmpty(partitionKey) 
+                ? partitionKey 
+                : _tenantContext.CurrentTenantId;
+
+            if (string.IsNullOrEmpty(resolvedPartitionKey))
+            {
+                throw new InvalidOperationException("PartitionKey must be provided or available in TenantContext.");
+            }
+
+            try
+            {
+                await _retryPolicy.ExecuteAsync(ct => 
+                    _container.CreateItemAsync(item, new PartitionKey(resolvedPartitionKey), cancellationToken: ct), cancellationToken);
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                throw new InvalidOperationException("An item with the same identifier already exists.", ex);
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                throw new Exception("Too many requests. Please try again later.", ex);
+            }
+            catch (CosmosException ex)
+            {
+                throw new Exception($"Failed to add item to Cosmos DB. Status: {ex.StatusCode}", ex);
+            }
         }
 
         public async Task DeleteItemAsync(string id, string partitionKey, CancellationToken cancellationToken = default)
@@ -43,7 +66,7 @@ namespace TaskManager.Infrastructure.Persistence
             }
         }
 
-        public async Task<IEnumerable<T>> GetItemsAsync(string query, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<T>> GetItemsAsync(string query, Dictionary<string, object>? parameters = null, string? partitionKey = null, CancellationToken cancellationToken = default)
         {
             var queryDefinition = new QueryDefinition(query);
 
@@ -55,11 +78,18 @@ namespace TaskManager.Infrastructure.Persistence
                 }
             }
 
-            // Scope query to the current tenant's partition
-            var requestOptions = new QueryRequestOptions
+            // Scope query to the current tenant's partition if a partition key is available either from parameter or context
+            var requestOptions = new QueryRequestOptions();
+            var resolvedPartitionKey = !string.IsNullOrEmpty(partitionKey) 
+                ? partitionKey 
+                : _tenantContext.CurrentTenantId;
+                
+            if (string.IsNullOrEmpty(resolvedPartitionKey))
             {
-                PartitionKey = new PartitionKey(_tenantContext.CurrentTenantId)
-            };
+                throw new InvalidOperationException("PartitionKey must be provided or available in TenantContext.");
+            }
+
+            requestOptions.PartitionKey = new PartitionKey(resolvedPartitionKey);
 
             var iterator = _container.GetItemQueryIterator<T>(queryDefinition, requestOptions: requestOptions);
             List<T> results = [];
@@ -78,11 +108,19 @@ namespace TaskManager.Infrastructure.Persistence
                 _container.ReplaceItemAsync(item, id, new PartitionKey(partitionKey), cancellationToken: ct), cancellationToken);
         }
 
-        public async Task UpsertItemAsync(T item, CancellationToken cancellationToken = default)
+        public async Task UpsertItemAsync(T item, string? partitionKey = null, CancellationToken cancellationToken = default)
         {
-            var partitionKey = new PartitionKey(_tenantContext.CurrentTenantId);
+            var resolvedPartitionKey = !string.IsNullOrEmpty(partitionKey) 
+                ? partitionKey 
+                : _tenantContext.CurrentTenantId;
+
+            if (string.IsNullOrEmpty(resolvedPartitionKey))
+            {
+                throw new InvalidOperationException("PartitionKey must be provided or available in TenantContext.");
+            }
+
             await _retryPolicy.ExecuteAsync(ct => 
-                _container.UpsertItemAsync(item, partitionKey, cancellationToken: ct), cancellationToken);
+                _container.UpsertItemAsync(item, new PartitionKey(resolvedPartitionKey), cancellationToken: ct), cancellationToken);
         }
     }
 }

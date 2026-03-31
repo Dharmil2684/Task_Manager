@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
@@ -14,15 +15,21 @@ namespace TaskManager.Services
         private readonly ICosmosDbRepository<InvitationToken> _invitationRepository;
         private readonly ICosmosDbRepository<User> _userRepository;
         private readonly IEmailService _emailService;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+        private readonly Microsoft.Extensions.Logging.ILogger<InvitationService> _logger;
 
         public InvitationService(
             ICosmosDbRepository<InvitationToken> invitationRepository, 
             ICosmosDbRepository<User> userRepository,
-            IEmailService emailService)
+            IEmailService emailService,
+            Microsoft.Extensions.Configuration.IConfiguration configuration,
+            Microsoft.Extensions.Logging.ILogger<InvitationService> logger)
         {
             _invitationRepository = invitationRepository;
             _userRepository = userRepository;
             _emailService = emailService;
+            _configuration = configuration;
+            _logger = logger;
         }
 
         public async Task AcceptInvitationAsync(string token, string password)
@@ -64,7 +71,7 @@ namespace TaskManager.Services
 
             try
             {
-                await _userRepository.AddItemAsync(user);
+                await _userRepository.AddItemAsync(user, user.TenantId.ToString());
             }
             catch
             {
@@ -81,7 +88,7 @@ namespace TaskManager.Services
             
             if (!Enum.TryParse<UserRole>(request.Role, true, out var role))
             {
-                throw new ArgumentException($"Invalid role: '{request.Role}'. Valid roles are: {string.Join(", ", Enum.GetNames<UserRole>())}.");
+                throw new ArgumentException($"Invalid role: '{request.Role}'. Valid roles are: {string.Join(", ", Enum.GetNames<UserRole>())}");
             }
 
             var invitation = new InvitationToken
@@ -95,11 +102,24 @@ namespace TaskManager.Services
                 IsUsed = false
             };
 
-            await _invitationRepository.AddItemAsync(invitation);
 
-            var link = $"https://app.yourdomain.com/accept-invite?token={rawToken}";
-            
-            await _emailService.SendInvitationEmailAsync(request.Email, link);
+            var baseUrl = _configuration["FrontendUrl"] ?? "http://localhost:3000";
+            var link = $"{baseUrl.TrimEnd('/')}/accept-invite?token={rawToken}";
+
+            // Persist the token first
+            await _invitationRepository.AddItemAsync(invitation, tenantId.ToString());
+
+            try
+            {
+                await _emailService.SendInvitationEmailAsync(request.Email, link);  
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send invitation email to {Email}", request.Email);
+                // Compensating action: remove the invitation since email failed
+                await _invitationRepository.DeleteItemAsync(invitation.Id.ToString(), tenantId.ToString());
+                throw new InvalidOperationException("Failed to send invitation email. Validation rolled back.", ex);
+            }
         }
 
         private static string HashToken(string token)

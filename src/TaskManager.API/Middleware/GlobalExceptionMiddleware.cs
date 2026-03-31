@@ -26,25 +26,24 @@ namespace TaskManager.API.Middleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An unhandled exception occurred.");
-
                 if (context.Response.HasStarted)
                 {
-                    _logger.LogWarning("Response has already started, unable to modify the response.");
+                    _logger.LogWarning(ex, "Response has already started, unable to modify the response.");
                     return;
                 }
 
-                await HandleExceptionAsync(context, ex);
+                await HandleExceptionAsync(context, ex, _logger);
             }
         }
 
-        private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private static Task HandleExceptionAsync(HttpContext context, Exception exception, ILogger logger)
         {
             var code = StatusCodes.Status500InternalServerError;
 
             switch (exception)
             {
                 case UnauthorizedAccessException:
+                case TaskManager.Core.Exceptions.AuthorizationException:
                     code = StatusCodes.Status401Unauthorized;
                     break;
                 case ArgumentException:
@@ -54,6 +53,15 @@ namespace TaskManager.API.Middleware
                 case System.Collections.Generic.KeyNotFoundException:
                     code = StatusCodes.Status404NotFound;
                     break;
+            }
+
+            if (code >= 500)
+            {
+                logger.LogError(exception, "An internal server error occurred.");
+            }
+            else
+            {
+                logger.LogWarning(exception, "Handled application exception: {Message}", exception.Message);
             }
 
             context.Response.ContentType = "application/json";

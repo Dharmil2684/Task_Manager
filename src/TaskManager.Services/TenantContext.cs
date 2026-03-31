@@ -22,7 +22,7 @@ namespace TaskManager.Services
                     return string.Empty;
                 }
 
-                var tenantClaim = user.Claims.FirstOrDefault(c => c.Type == "TenantId");
+                var tenantClaim = user.Claims.FirstOrDefault(c => string.Equals(c.Type, "tenantId", StringComparison.OrdinalIgnoreCase));
 
                 if (tenantClaim == null || string.IsNullOrWhiteSpace(tenantClaim.Value))
                 {

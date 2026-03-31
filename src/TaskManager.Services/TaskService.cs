@@ -31,7 +31,7 @@ namespace TaskManager.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            await _taskRepository.AddItemAsync(task);
+            await _taskRepository.AddItemAsync(task, task.TenantId.ToString());
             return MapToResponse(task);
         }
 
@@ -44,8 +44,8 @@ namespace TaskManager.Services
                 throw new KeyNotFoundException("Task not found.");
             }
 
-            // Only the assignee, Managers, or TenantAdmins can delete
-            if (task.AssigneeId != userId && userRole != UserRole.Manager && userRole != UserRole.TenantAdmin)
+            // Only Managers or TenantAdmins can delete tasks
+            if (userRole != UserRole.Manager && userRole != UserRole.TenantAdmin)
             {
                 throw new UnauthorizedAccessException("You do not have permission to delete this task.");
             }

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using TaskManager.Core.DTOs.Auth;
 using TaskManager.Core.Entities;
+using TaskManager.Core.Exceptions;
 using TaskManager.Core.Interfaces;
 
 namespace TaskManager.Services
@@ -43,7 +44,7 @@ namespace TaskManager.Services
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
-                throw new UnauthorizedAccessException("Invalid credentials");
+                throw new AuthorizationException("Invalid credentials");
             }
 
             return await GenerateTokensAsync(user);
@@ -59,7 +60,7 @@ namespace TaskManager.Services
 
             if (user == null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
             {
-                throw new UnauthorizedAccessException("Invalid or expired refresh token");
+                throw new AuthorizationException("Invalid or expired refresh token");
             }
 
             return await GenerateTokensAsync(user);
@@ -93,7 +94,7 @@ namespace TaskManager.Services
                 SubscriptionTier = "Free",
                 CreatedAt = DateTime.UtcNow
             };
-            await _tenantRepository.AddItemAsync(tenant);
+            await _tenantRepository.AddItemAsync(tenant, tenantId.ToString());
 
             // 2. Create Tenant Admin (with compensating rollback if user creation fails)
             var userId = Guid.NewGuid();
@@ -109,7 +110,7 @@ namespace TaskManager.Services
 
             try
             {
-                await _userRepository.AddItemAsync(user);
+                await _userRepository.AddItemAsync(user, tenantId.ToString());
             }
             catch
             {
