@@ -84,12 +84,10 @@ namespace TaskManager.Infrastructure.Persistence
                 ? partitionKey 
                 : _tenantContext.CurrentTenantId;
                 
-            if (string.IsNullOrEmpty(resolvedPartitionKey))
+            if (!string.IsNullOrEmpty(resolvedPartitionKey))
             {
-                throw new InvalidOperationException("PartitionKey must be provided or available in TenantContext.");
+                requestOptions.PartitionKey = new PartitionKey(resolvedPartitionKey);
             }
-
-            requestOptions.PartitionKey = new PartitionKey(resolvedPartitionKey);
 
             var iterator = _container.GetItemQueryIterator<T>(queryDefinition, requestOptions: requestOptions);
             List<T> results = [];
