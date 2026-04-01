@@ -16,8 +16,9 @@ namespace TaskManager.Infrastructure
 
         public async Task InitializeAsync()
         {
-            // Create database
-            DatabaseResponse databaseResponse = await _client.CreateDatabaseIfNotExistsAsync(_databaseName);
+            // Create database with Shared Throughput (400 RU/s minimum) 
+            // This prevents exceeding the 1000 RU/s free tier limit when creating multiple containers.
+            DatabaseResponse databaseResponse = await _client.CreateDatabaseIfNotExistsAsync(_databaseName, throughput: 400);
             Database database = databaseResponse.Database;
 
             // Create container for Tenants
