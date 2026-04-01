@@ -2,6 +2,11 @@
 
 A production-ready .NET 10 Task Manager API built with Clean Architecture, Azure Cosmos DB, strict multi-tenant data isolation, and robust observability.
 
+## 🎉 Live API Demo
+
+The API is actively containerized and deployed live on an AWS EC2 instance. You can interact with the endpoints and view the full documentation via Swagger here:
+**[http://13.126.57.154:8080/swagger/index.html](http://13.126.57.154:8080/swagger/index.html)**
+
 ## Features
 
 - **Clean Architecture:** Domain-driven application with clear separation of concerns (Core, Infrastructure, Services, API).
@@ -94,8 +99,16 @@ docker run -it --rm -p 8080:8080 \
   taskmanager-api:latest
 ```
 
-## Production Deployment Context
+## Production Deployment Context (AWS EC2 & GitHub Actions)
 
-1. **Host Restrictions**: `AllowedHosts` is restricted dynamically in `appsettings.Production.json`. Remember to attach your production URL before scaling up.
-2. **Environment Overrides**: If deploying to Azure Container Apps or App Service, directly inject `CosmosDb__EndpointUri` as an App Setting variable, effectively superseding `.json` configurations.
-3. **Log Aggregation**: The container natively streams Serilog JSON outputs onto STDOUT. If hosting on Azure Infrastructure, the orchestration plane will natively ingest and format these structured JSON packets directly into Azure Log Analytics or Application Insights.
+The application features a fully automated CI/CD pipeline integrated directly into GitHub Actions (`ci.yml`).
+
+1. **Continuous Integration**: On every push to `main`, the pipeline automatically restores dependencies, builds the `.sln`, executes the comprehensive xUnit test suite, and builds a fresh production Docker Image.
+2. **Container Registry**: The image is securely pushed to the GitHub Container Registry (`ghcr.io`).
+3. **Automated EC2 Deployment**: After a successful build, the `deploy` job securely SSH's into the AWS EC2 Ubuntu instance using `appleboy/ssh-action`. It executes a `deploy.sh` script which pulls the newest Docker image, gracefully stops the previous container, and spins up the new container ensuring zero-downtime continuous deployment.
+4. **Cosmos DB Free Tier Optimizations**: The deployment initializes Azure Cosmos DB with shared database-level throughput (`400 RU/s Minimum`), smartly allowing dynamic container provisioning without exceeding the strict Azure Free Tier limits.
+5. **Host Filtering Configured**: The Kestrel `AllowedHosts` property in `appsettings.Production.json` has been overridden to explicitly allow raw IP traffic for the EC2 deployment, while Swagger UI is unconditionally mounted for immediate accessibility.
+
+## ⚠️ Known Issues
+
+- **Email Deliverability (SendGrid & Gmail Rate Limiting):** Because the active deployment currently utilizes an unverified sender domain on SendGrid, providers like Gmail will occasionally rate-limit or outright defer outgoing transactional emails (like user invitations). Moving forward, establishing complete Sender Authentication and Domain DNS Verification via the SendGrid dashboard is required to guarantee reliable email throughput.
