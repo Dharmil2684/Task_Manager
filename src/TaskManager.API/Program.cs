@@ -125,15 +125,17 @@ using (var scope = app.Services.CreateScope())
 // ── Middleware pipeline ────────────────────────────────────────────
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
-if (app.Environment.IsDevelopment())
+// Enable Swagger UI across all environments for testing.
+// In the future, you may want to restrict this to only Development or specific IPs.
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "TaskManager API V1");
-        c.RoutePrefix = string.Empty;
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "TaskManager API V1");
+    // Leave RoutePrefix as string.Empty if you want it to load immediately at the root (/) instead of /swagger
+    // But since the user visits /swagger, we'll let it be default just in case. 
+    // Wait, the original code had c.RoutePrefix = string.Empty; 
+    c.RoutePrefix = "swagger"; 
+});
 
 // app.UseHttpsRedirection();
 
